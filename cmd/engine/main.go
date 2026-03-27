@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"event-engine-starter/internal/adapter"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/nats-io/nats.go"
@@ -68,6 +69,14 @@ func main() {
 	}
 	defer nc.Close()
 	log.Printf("connected to NATS at %s", cfg.Broker.URL)
+
+	// Optionally start embedded adapter for demo flows.
+	if os.Getenv("RUN_ADAPTER") == "1" {
+		engineURL := fmt.Sprintf("http://localhost:%d", cfg.API.HttpPort)
+		if err := adapter.Start(ctx, nc, engineURL); err != nil {
+			log.Printf("failed to start adapter: %v", err)
+		}
+	}
 
 	// Set up payload repository (Redis or in-memory).
 	var payloadRepo repository.PayloadRepository
