@@ -5,6 +5,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -96,6 +97,7 @@ func Load(path string) (*Config, error) {
 	}
 
 	applyDefaults(cfg)
+	overrideFromEnv(cfg)
 
 	return cfg, nil
 }
@@ -121,5 +123,60 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Broker.URL == "" {
 		cfg.Broker.URL = "nats://localhost:4222"
+	}
+}
+
+// overrideFromEnv lets environment variables override config values.
+// This is useful in hosted environments like Railway where connection
+// details come from env vars rather than a local YAML file.
+func overrideFromEnv(cfg *Config) {
+	// API port
+	if v := os.Getenv("API_HTTP_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.API.HttpPort = p
+		}
+	}
+
+	// Database
+	if v := os.Getenv("DB_HOST"); v != "" {
+		cfg.DB.Host = v
+	}
+	if v := os.Getenv("DB_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.DB.Port = p
+		}
+	}
+	if v := os.Getenv("DB_NAME"); v != "" {
+		cfg.DB.Name = v
+	}
+	if v := os.Getenv("DB_USER"); v != "" {
+		cfg.DB.User = v
+	}
+	if v := os.Getenv("DB_PASSWORD"); v != "" {
+		cfg.DB.Password = v
+	}
+
+	// Payload store (Redis)
+	if v := os.Getenv("PAYLOAD_STORE_TYPE"); v != "" {
+		cfg.PayloadStore.Type = v
+	}
+	if v := os.Getenv("REDIS_HOST"); v != "" {
+		cfg.PayloadStore.Host = v
+	}
+	if v := os.Getenv("REDIS_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			cfg.PayloadStore.Port = p
+		}
+	}
+
+	// Broker (NATS)
+	if v := os.Getenv("NATS_URL"); v != "" {
+		cfg.Broker.URL = v
+	}
+
+	// Metrics
+	if v := os.Getenv("METRICS_ENABLED"); v != "" {
+		// any value other than explicit "false" means enabled
+		cfg.Metrics.Enabled = v != "false"
 	}
 }

@@ -20,7 +20,7 @@ WORKDIR /app
 COPY --from=builder /app/engine /app/engine
 COPY migrations/ /app/migrations/
 COPY web/ /app/web/
-COPY config.yaml /app/config.yaml
+COPY config.railway.yaml /app/config.railway.yaml
 
 EXPOSE 8080
 

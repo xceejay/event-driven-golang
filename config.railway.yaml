@@ -1,0 +1,70 @@
+api:
+  http_port: 8080
+
+db:
+  # Values will be overridden from env DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
+  host: ""
+  port: 0
+  name: ""
+  user: ""
+  password: ""
+
+payload_store:
+  type: redis
+  # Values will be overridden from env REDIS_HOST, REDIS_PORT
+  host: ""
+  port: 0
+
+broker:
+  # Value will be overridden from env NATS_URL
+  url: ""
+
+jobs:
+  flow_a:
+    awaiting:
+      interval_ms: 2000
+      startup_delay_ms: 2750
+      batch_size: 100
+      max_items: 100000
+      max_fails: 100
+      max_runtime_ms: 30000
+    scheduled:
+      interval_ms: 5000
+      startup_delay_ms: 3750
+      batch_size: 100
+      max_items: 100000
+      max_fails: 100
+      max_runtime_ms: 30000
+    suspended:
+      interval_ms: 5000
+      startup_delay_ms: 4000
+      batch_size: 100
+      max_items: 100000
+      max_fails: 100
+      max_runtime_ms: 30000
+
+  flow_b:
+    awaiting:
+      interval_ms: 2000
+      startup_delay_ms: 2750
+      batch_size: 100
+      max_items: 100000
+      max_fails: 100
+      max_runtime_ms: 30000
+    scheduled:
+      interval_ms: 5000
+      startup_delay_ms: 3750
+      batch_size: 100
+      max_items: 100000
+      max_fails: 100
+      max_runtime_ms: 30000
+    suspended:
+      interval_ms: 5000
+      startup_delay_ms: 4000
+      batch_size: 100
+      max_items: 100000
+      max_fails: 100
+      max_runtime_ms: 30000
+
+metrics:
+  enabled: true
