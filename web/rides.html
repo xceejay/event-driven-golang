@@ -50,6 +50,27 @@
     /* Topbar */
     .topbar { height: 60px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; gap: 16px; background: var(--bg-card); position: sticky; top: 0; z-index: 50; }
     .topbar h1 { font-size: 18px; font-weight: 600; }
+    .nav-pills {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card-inner);
+      border-radius: 999px;
+      padding: 3px;
+    }
+    .nav-pill {
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font);
+    }
+    .nav-pill:hover { color: var(--text); }
+    .nav-pill.active { background: var(--accent); color: #111; }
     .conn-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
     .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #F87171; }
     .conn-dot.connected { background: #4ADE80; }
@@ -110,6 +131,12 @@
       .card { padding: 18px; }
       .topbar { padding: 0 12px; gap: 8px; }
       .topbar h1 { display: none; }
+      .nav-pills {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        flex: 1;
+        justify-content: center;
+      }
       .steps-chain { flex-direction: column; align-items: stretch; gap: 8px; overflow-x: visible; }
       .step-card { min-width: 100%; border-radius: var(--radius-sm); }
       .step-arrow { display: none; }
@@ -195,7 +222,10 @@
     <div class="main">
       <header class="topbar">
         <h1>Ride-Hailing Demo</h1>
-        <div style="flex:1"></div>
+        <nav class="nav-pills" style="margin-left:auto;margin-right:16px">
+          <button class="nav-pill" onclick="window.location.href='/'">Dashboard</button>
+          <button class="nav-pill active" onclick="window.location.href='/rides.html'">Ride Demo</button>
+        </nav>
         <div class="conn-status">
           <div class="conn-dot" id="connDot"></div>
           <span id="connLabel">Connecting...</span>
