@@ -17,7 +17,10 @@ func main() {
     log.SetPrefix("[migrate] ")
 
     cfgPath := "config.yaml"
-    if p := os.Getenv("CONFIG_PATH"); p != "" {
+    // On Railway, use the Railway-specific config file.
+    if os.Getenv("RAILWAY_ENVIRONMENT") != "" {
+        cfgPath = "config.railway.yaml"
+    } else if p := os.Getenv("CONFIG_PATH"); p != "" {
         cfgPath = p
     }
 
