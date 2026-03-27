@@ -1,4 +1,4 @@
-INSERT INTO event_lifecycle_config (event_type, flow_type, max_attempts, event_lifespan_seconds, is_suspended, attempt_lifecycle_configs)
+INSERT IGNORE INTO event_lifecycle_config (event_type, flow_type, max_attempts, event_lifespan_seconds, is_suspended, attempt_lifecycle_configs)
 VALUES
   (
     'FLOW_A_STEP_1_REQUESTED',

@@ -19,6 +19,7 @@ import (
 	"event-engine-starter/config"
 	"event-engine-starter/internal/job"
 	mcpserver "event-engine-starter/internal/mcp"
+	internalmigrate "event-engine-starter/internal/migrate"
 	"event-engine-starter/internal/model"
 	"event-engine-starter/internal/repository"
 	"event-engine-starter/internal/service"
@@ -53,6 +54,12 @@ func main() {
 	db.SetMaxOpenConns(cfg.DB.MaxOpenConns)
 	db.SetMaxIdleConns(cfg.DB.MaxIdleConns)
 	log.Printf("connected to MySQL at %s:%d/%s", cfg.DB.Host, cfg.DB.Port, cfg.DB.Name)
+
+	// Apply SQL migrations (idempotent).
+	if err := internalmigrate.Apply(db, "migrations"); err != nil {
+		log.Fatalf("apply migrations: %v", err)
+	}
+	log.Printf("migrations applied successfully")
 
 	// Connect to NATS.
 	nc, err := nats.Connect(cfg.Broker.URL)
