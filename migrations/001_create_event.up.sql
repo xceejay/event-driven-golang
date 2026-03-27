@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS event (
+  id                        CHAR(36)     NOT NULL,
+  event_type                VARCHAR(255) NOT NULL,
+  flow_type                 VARCHAR(100) NOT NULL,
+  flow_id                   VARCHAR(255) NOT NULL,
+  status                    VARCHAR(50)  NOT NULL,
+  version                   BIGINT       NOT NULL DEFAULT 0,
+  attempts_left             INT          NOT NULL,
+  attempts_failed           INT          NOT NULL DEFAULT 0,
+  attempt_scheduled_at      DATETIME(3)  NULL,
+  attempt_due_date          DATETIME(3)  NULL,
+  event_processing_due_date DATETIME(3)  NULL,
+  on_fail_event_type        VARCHAR(255) NULL,
+  schedule_state            VARCHAR(50)  NOT NULL DEFAULT 'ACTIVE',
+  created_at                DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  updated_at                DATETIME(3)  NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  INDEX idx_event_flow_status (flow_type, status),
+  INDEX idx_event_flow_scheduled (flow_type, schedule_state, attempt_scheduled_at),
+  INDEX idx_event_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

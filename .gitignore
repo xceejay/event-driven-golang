@@ -1,0 +1,16 @@
+# Binaries
+bin/
+*.exe
+*.out
+
+# Local config / secrets
+config.yaml
+.claude/
+
+# Build artifacts
+*.log
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

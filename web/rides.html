@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ride Demo — Event Engine</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #F5F5F0;
+      --bg-card: #FFFFFF;
+      --bg-card-inner: #F9F9F5;
+      --bg-section-alt: #EDEDEA;
+      --text: #1A1A1A;
+      --text-muted: #8A8A8A;
+      --text-muted-faint: #B0B0A8;
+      --accent: #C8F542;
+      --accent-hover: #B8E232;
+      --border: #E8E8E3;
+      --radius: 18px;
+      --radius-sm: 11px;
+      --font: 'DM Sans', sans-serif;
+    }
+    [data-theme="dark"] {
+      --bg: #111111;
+      --bg-card: #1A1A1A;
+      --bg-card-inner: #222222;
+      --bg-section-alt: #161616;
+      --text: #F5F5F0;
+      --text-muted: #7A7A7A;
+      --text-muted-faint: #4A4A4A;
+      --border: #2A2A2A;
+      --accent-hover: #D4FF2B;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; transition: background 0.3s, color 0.3s; }
+    .app { display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar { width: 64px; background: var(--bg-card); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding: 16px 0; gap: 20px; position: fixed; top: 0; left: 0; bottom: 0; z-index: 100; }
+    .sidebar-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.2s; text-decoration: none; color: inherit; }
+    .sidebar-icon:hover { background: var(--bg-card-inner); }
+    .sidebar-icon.active { background: var(--accent); color: #111; }
+    .sidebar .logo { width: 36px; height: 36px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; color: #111; margin-bottom: 12px; }
+
+    .main { margin-left: 64px; flex: 1; }
+
+    /* Topbar */
+    .topbar { height: 60px; border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 28px; gap: 16px; background: var(--bg-card); position: sticky; top: 0; z-index: 50; }
+    .topbar h1 { font-size: 18px; font-weight: 600; }
+    .conn-status { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; background: #F87171; }
+    .conn-dot.connected { background: #4ADE80; }
+    .theme-toggle { width: 36px; height: 36px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+
+    .content { padding: 24px 28px; max-width: 1400px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); padding: 28px; }
+    .card-title { font-size: 13px; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 16px; }
+
+    /* Hero */
+    .hero { text-align: center; padding: 32px 28px 24px; }
+    .hero h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 8px; }
+    .hero p { font-size: 15px; color: var(--text-muted); max-width: 680px; margin: 0 auto; line-height: 1.6; }
+
+    /* Steps Explainer — the core teaching element */
+    .steps-chain { display: flex; align-items: stretch; gap: 0; margin-bottom: 28px; overflow-x: auto; }
+    .step-card {
+      flex: 1; min-width: 140px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      padding: 18px 14px;
+      text-align: center;
+      position: relative;
+    }
+    .step-card:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+    .step-card:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+    .step-card .step-num {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: var(--bg-card-inner);
+      border: 2px solid var(--border);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: var(--text-muted);
+      margin-bottom: 8px;
+      transition: all 0.4s;
+    }
+    .step-card.done .step-num { background: #4ADE80; border-color: #4ADE80; color: #fff; }
+    .step-card.active .step-num { background: var(--accent); border-color: var(--accent); color: #111; animation: pulse 1.5s ease-in-out infinite; }
+    .step-card.failed .step-num { background: #F87171; border-color: #F87171; color: #fff; }
+    .step-card .step-icon { font-size: 22px; margin-bottom: 6px; }
+    .step-card .step-label { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+    .step-card .step-engine { font-size: 10px; color: var(--text-muted); font-weight: 500; }
+    .step-card .step-time { font-size: 10px; color: var(--accent); font-weight: 600; margin-top: 4px; min-height: 14px; }
+    .step-arrow {
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted-faint); font-size: 18px;
+      min-width: 20px; flex-shrink: 0;
+    }
+    .step-arrow.done { color: #4ADE80; }
+
+    /* Main grid */
+    .grid { display: grid; grid-template-columns: 1fr 400px; gap: 20px; }
+    @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; } }
+    @media (max-width: 767px) { .sidebar { display: none; } .main { margin-left: 0; } .steps-chain { flex-wrap: wrap; } .step-card { min-width: 100px; } }
+
+    /* Map */
+    .map-area { width: 100%; height: 300px; background: var(--bg-card-inner); border-radius: var(--radius-sm); position: relative; overflow: hidden; }
+    .map-label { font-size: 9px; fill: var(--text-muted-faint); font-family: 'DM Sans', sans-serif; font-weight: 500; }
+    @keyframes mapPulse { 0%, 100% { r: 14; opacity: 0.2; } 50% { r: 22; opacity: 0.05; } }
+    .map-pulse { animation: mapPulse 2s ease-in-out infinite; }
+
+    /* Request form */
+    .ride-input-group { display: flex; align-items: center; gap: 12px; background: var(--bg-card-inner); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 16px; }
+    .ride-input-group .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .ride-input-group input { flex: 1; background: none; border: none; outline: none; font-family: var(--font); font-size: 14px; color: var(--text); }
+    .ride-input-group input::placeholder { color: var(--text-muted); }
+    .ride-connector { width: 2px; height: 14px; background: var(--border); margin-left: 20px; }
+    .btn { padding: 12px 24px; border-radius: 999px; font-family: var(--font); font-size: 14px; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s; }
+    .btn-primary { background: var(--accent); color: #111; }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-primary:active { transform: scale(0.98); }
+    .btn-secondary { background: var(--bg-card-inner); color: var(--text); border: 1px solid var(--border); }
+
+    /* Rides list */
+    .rides-list { display: flex; flex-direction: column; gap: 14px; max-height: 600px; overflow-y: auto; }
+    .ride-card { background: var(--bg-card-inner); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; animation: fadeIn 0.4s ease; }
+    .ride-card.active-glow { border-color: var(--accent); }
+    .ride-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .ride-id { font-size: 12px; font-weight: 600; font-family: 'DM Sans', monospace; color: var(--text-muted); background: var(--bg-card); padding: 2px 8px; border-radius: 6px; }
+    .ride-badge { font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+    .ride-route { font-size: 13px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
+    .ride-route-line { display: flex; align-items: center; gap: 8px; }
+    .ride-route-line .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+    /* Mini progress in ride card */
+    .mini-progress { display: flex; gap: 3px; margin-bottom: 8px; }
+    .mini-step { flex: 1; height: 4px; background: var(--border); border-radius: 2px; transition: background 0.5s; }
+    .mini-step.done { background: #4ADE80; }
+    .mini-step.active { background: var(--accent); animation: pulse 1.5s ease-in-out infinite; }
+    .mini-step.failed { background: #F87171; }
+
+    .ride-status { font-size: 12px; display: flex; align-items: center; gap: 8px; }
+    .spinner { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    .ride-timer { font-size: 11px; font-weight: 600; font-family: 'DM Sans', monospace; color: var(--text-muted); margin-left: auto; }
+    .ride-timer.live { color: var(--accent); }
+
+    /* Event log */
+    .event-log { list-style: none; max-height: 240px; overflow-y: auto; }
+    .log-item { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--border); animation: fadeIn 0.3s ease; font-size: 12px; }
+    .log-item:last-child { border-bottom: none; }
+    .log-dot { width: 6px; height: 6px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+    .log-text { flex: 1; line-height: 1.4; color: var(--text-muted); }
+    .log-text strong { color: var(--text); font-weight: 600; }
+    .log-time { font-size: 10px; color: var(--text-muted-faint); white-space: nowrap; }
+
+    /* Stats */
+    .stats-bar { display: flex; gap: 0; margin-bottom: 24px; border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+    .stat-item { flex: 1; padding: 18px 16px; text-align: center; background: var(--bg-card); border-right: 1px solid var(--border); }
+    .stat-item:last-child { border-right: none; }
+    .stat-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <nav class="sidebar">
+      <div class="logo">EE</div>
+      <a href="/" class="sidebar-icon" title="Dashboard">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+      </a>
+      <a href="/rides.html" class="sidebar-icon active" title="Ride Demo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3v-6l2-5h9l4 5h3v6h-2"/><path d="M5 6h9l4 5"/></svg>
+      </a>
+      <div class="sidebar-icon" title="Settings" style="margin-top:auto">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+    </nav>
+
+    <div class="main">
+      <header class="topbar">
+        <h1>Ride-Hailing Demo</h1>
+        <div style="flex:1"></div>
+        <div class="conn-status">
+          <div class="conn-dot" id="connDot"></div>
+          <span id="connLabel">Connecting...</span>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()"><span id="themeIcon">&#9789;</span></button>
+      </header>
+
+      <div class="content">
+        <div class="hero">
+          <h2>One Ride, Six Events</h2>
+          <p>A single ride request triggers a <strong>chain of events</strong>. Each step is an independent event processed by a different worker. When one step succeeds, it automatically publishes the next. If a step fails, the engine retries it — without affecting other steps. This is event-driven architecture.</p>
+        </div>
+
+        <!-- The 6-step chain — this is the main teaching visual -->
+        <div class="steps-chain" id="stepsChain">
+          <div class="step-card" data-step="RIDE_REQUESTED">
+            <div class="step-num">1</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </div>
+            <div class="step-label">Ride Requested</div>
+            <div class="step-engine">RIDE_REQUESTED</div>
+            <div class="step-time" data-step-time="RIDE_REQUESTED"></div>
+          </div>
+          <div class="step-arrow">&rarr;</div>
+          <div class="step-card" data-step="DRIVER_MATCHED">
+            <div class="step-num">2</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <div class="step-label">Driver Matched</div>
+            <div class="step-engine">DRIVER_MATCHED</div>
+            <div class="step-time" data-step-time="DRIVER_MATCHED"></div>
+          </div>
+          <div class="step-arrow">&rarr;</div>
+          <div class="step-card" data-step="DRIVER_ARRIVED">
+            <div class="step-num">3</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3v-6l2-5h9l4 5h3v6h-2"/></svg>
+            </div>
+            <div class="step-label">Driver Arrives</div>
+            <div class="step-engine">DRIVER_ARRIVED</div>
+            <div class="step-time" data-step-time="DRIVER_ARRIVED"></div>
+          </div>
+          <div class="step-arrow">&rarr;</div>
+          <div class="step-card" data-step="TRIP_STARTED">
+            <div class="step-num">4</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            </div>
+            <div class="step-label">Trip In Progress</div>
+            <div class="step-engine">TRIP_STARTED</div>
+            <div class="step-time" data-step-time="TRIP_STARTED"></div>
+          </div>
+          <div class="step-arrow">&rarr;</div>
+          <div class="step-card" data-step="TRIP_COMPLETED">
+            <div class="step-num">5</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="step-label">Trip Ends</div>
+            <div class="step-engine">TRIP_COMPLETED</div>
+            <div class="step-time" data-step-time="TRIP_COMPLETED"></div>
+          </div>
+          <div class="step-arrow">&rarr;</div>
+          <div class="step-card" data-step="PAYMENT_PROCESSED">
+            <div class="step-num">6</div>
+            <div class="step-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            </div>
+            <div class="step-label">Payment</div>
+            <div class="step-engine">PAYMENT_PROCESSED</div>
+            <div class="step-time" data-step-time="PAYMENT_PROCESSED"></div>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-bar">
+          <div class="stat-item">
+            <div class="stat-value" id="statTotal">0</div>
+            <div class="stat-label">Rides Requested</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" style="color:var(--accent)" id="statActive">0</div>
+            <div class="stat-label">In Progress</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" style="color:#4ADE80" id="statDone">0</div>
+            <div class="stat-label">Completed</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" style="color:#F87171" id="statFailed">0</div>
+            <div class="stat-label">Failed</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <!-- Left column -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <!-- Map -->
+            <div class="card">
+              <div class="card-title">Live Map</div>
+              <div class="map-area">
+                <svg width="100%" height="100%" viewBox="0 0 600 300" id="mapSvg">
+                  <defs>
+                    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+                      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="var(--border)" stroke-width="0.5" opacity="0.5"/>
+                    </pattern>
+                  </defs>
+                  <rect width="600" height="300" fill="url(#grid)"/>
+                  <line x1="0" y1="75" x2="600" y2="75" stroke="var(--text-muted-faint)" stroke-width="3" opacity="0.25"/>
+                  <line x1="0" y1="180" x2="600" y2="180" stroke="var(--text-muted-faint)" stroke-width="3" opacity="0.25"/>
+                  <line x1="120" y1="0" x2="120" y2="300" stroke="var(--text-muted-faint)" stroke-width="3" opacity="0.25"/>
+                  <line x1="300" y1="0" x2="300" y2="300" stroke="var(--text-muted-faint)" stroke-width="2" opacity="0.2"/>
+                  <line x1="480" y1="0" x2="480" y2="300" stroke="var(--text-muted-faint)" stroke-width="3" opacity="0.25"/>
+                  <line x1="0" y1="260" x2="600" y2="260" stroke="var(--text-muted-faint)" stroke-width="2" opacity="0.2"/>
+                  <text x="55" y="68" class="map-label">Downtown</text>
+                  <text x="250" y="175" class="map-label">Central Park</text>
+                  <text x="430" y="68" class="map-label">Tech District</text>
+                  <text x="130" y="252" class="map-label">Riverside</text>
+                  <text x="490" y="252" class="map-label">Airport</text>
+                  <g id="mapPins"></g>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Request form -->
+            <div class="card">
+              <div class="card-title">Request a Ride</div>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <div class="ride-input-group">
+                  <div class="dot" style="background:var(--accent)"></div>
+                  <input type="text" id="pickupInput" value="Downtown">
+                </div>
+                <div class="ride-connector"></div>
+                <div class="ride-input-group">
+                  <div class="dot" style="background:#5B8DEF"></div>
+                  <input type="text" id="destInput" value="Airport">
+                </div>
+                <div style="display:flex;gap:10px;margin-top:4px">
+                  <button class="btn btn-primary" style="flex:1" onclick="requestRide()">Request Ride</button>
+                  <button class="btn btn-secondary" onclick="requestRide();requestRide();requestRide();">3 Rides</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- How events chain -->
+            <div class="card">
+              <div class="card-title">How Event Chaining Works</div>
+              <div style="font-size:13px;color:var(--text-muted);line-height:1.7">
+                <p style="margin-bottom:10px"><strong style="color:var(--text)">Each step is a separate event.</strong> When "Ride Requested" finishes processing, the worker tells the engine "success" and includes a <strong style="color:var(--text)">spinoff event</strong> — "DRIVER_MATCHED". The engine publishes that as a brand new event, which goes through the same lifecycle: queue, dispatch, process.</p>
+                <p style="margin-bottom:10px"><strong style="color:var(--text)">If a step fails, only that step retries.</strong> If driver matching fails, the engine waits 5 seconds and retries — without affecting any other ride. The retry delay increases with each attempt (5s, then 10s).</p>
+                <p><strong style="color:var(--text)">Steps are decoupled.</strong> The "Trip Started" worker doesn't know about payment. The "Payment" worker doesn't know about drivers. Each is an independent service connected only by events.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right column: rides + log -->
+          <div style="display:flex;flex-direction:column;gap:20px">
+            <div class="card" style="flex:1">
+              <div class="card-title">Active Rides</div>
+              <div class="rides-list" id="ridesList">
+                <div style="text-align:center;padding:40px 20px;color:var(--text-muted)">
+                  <p style="font-size:13px">No rides yet. Hit "Request Ride" to start.</p>
+                </div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-title">Event Log</div>
+              <ul class="event-log" id="eventLog">
+                <li class="log-item">
+                  <div class="log-dot" style="background:var(--text-muted-faint)"></div>
+                  <div class="log-text">Waiting for events...</div>
+                  <div class="log-time">--</div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin + '/api';
+    const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws';
+
+    // --- The 6 ride steps in order ---
+    const STEPS = [
+      { event: 'RIDE_REQUESTED',    label: 'Searching for driver...',    color: '#FFB84D' },
+      { event: 'DRIVER_MATCHED',    label: 'Driver heading to you...',   color: '#5B8DEF' },
+      { event: 'DRIVER_ARRIVED',    label: 'Driver waiting at pickup',   color: '#A78BFA' },
+      { event: 'TRIP_STARTED',      label: 'Trip in progress...',        color: '#C8F542' },
+      { event: 'TRIP_COMPLETED',    label: 'Calculating fare...',        color: '#4ADE80' },
+      { event: 'PAYMENT_PROCESSED', label: 'Payment complete!',          color: '#4ADE80' },
+    ];
+
+    const LOCATIONS = [
+      { name: 'Downtown', x: 80, y: 90 },
+      { name: 'Tech District', x: 450, y: 85 },
+      { name: 'Central Park', x: 270, y: 165 },
+      { name: 'Riverside', x: 140, y: 240 },
+      { name: 'Airport', x: 500, y: 240 },
+    ];
+
+    const DRIVERS = ['Sarah K.', 'James R.', 'Maria L.', 'David W.', 'Aisha M.', 'Chen Y.'];
+
+    // --- State: track rides by flow_id ---
+    const rides = new Map(); // flowId -> ride
+    const eventToFlow = new Map(); // eventId -> flowId (to route WS updates)
+    let ws = null;
+
+    function createRide(flowId, firstEventId, pickup, dest) {
+      const pickupLoc = LOCATIONS.find(l => l.name === pickup) || LOCATIONS[0];
+      const destLoc = LOCATIONS.find(l => l.name === dest) || LOCATIONS[LOCATIONS.length - 1];
+      const ride = {
+        flowId,
+        pickup, dest,
+        pickupLoc, destLoc,
+        driver: DRIVERS[Math.floor(Math.random() * DRIVERS.length)],
+        price: (8 + Math.random() * 22).toFixed(2),
+        currentStep: 0,  // index into STEPS
+        stepTimes: {},    // eventType -> { start, end }
+        failed: false,
+        done: false,
+        startedAt: Date.now(),
+      };
+      ride.stepTimes['RIDE_REQUESTED'] = { start: Date.now(), end: null };
+      rides.set(flowId, ride);
+      eventToFlow.set(firstEventId, flowId);
+      renderAll();
+    }
+
+    // --- Handle WebSocket event updates ---
+    function onEventUpdate(ev) {
+      const flowId = eventToFlow.get(ev.id) || ev.flow_id;
+      const ride = rides.get(flowId);
+      if (!ride) {
+        // Could be a spinoff event we haven't seen — register it
+        if (ev.flow_id && rides.has(ev.flow_id)) {
+          eventToFlow.set(ev.id, ev.flow_id);
+          onEventUpdate(ev); // re-process
+        }
+        return;
+      }
+
+      // Register this event ID to the flow
+      eventToFlow.set(ev.id, flowId);
+
+      const eventType = ev.event_type;
+      const status = ev.status;
+
+      // Find which step this event corresponds to
+      const stepIdx = STEPS.findIndex(s => s.event === eventType);
+      if (stepIdx < 0) return;
+
+      // Track timing
+      if (!ride.stepTimes[eventType]) {
+        ride.stepTimes[eventType] = { start: Date.now(), end: null };
+      }
+
+      if (status === 'PROCESSED') {
+        // Step completed successfully
+        ride.stepTimes[eventType].end = Date.now();
+        ride.currentStep = stepIdx + 1; // advance to next
+
+        if (stepIdx === STEPS.length - 1) {
+          // Final step done — ride complete!
+          ride.done = true;
+          addLog('#4ADE80', `<strong>Ride complete!</strong> ${ride.pickup} &rarr; ${ride.dest} — $${ride.price}`);
+        } else {
+          addLog(STEPS[stepIdx].color, `<strong>${STEPS[stepIdx].event}</strong> done &mdash; chaining to ${STEPS[stepIdx + 1].event}`);
+        }
+      } else if (status === 'FAILED') {
+        ride.stepTimes[eventType].end = Date.now();
+        ride.failed = true;
+        ride.failedStep = stepIdx;
+        addLog('#F87171', `<strong>${eventType} FAILED</strong> — ${ride.pickup} &rarr; ${ride.dest}`);
+      } else if (status === 'AWAITING_PROCESSING') {
+        // New step queued (spinoff arrived) or retry
+        if (!ride.stepTimes[eventType] || ride.stepTimes[eventType].end) {
+          ride.stepTimes[eventType] = { start: Date.now(), end: null };
+        }
+        if (stepIdx > ride.currentStep) {
+          // It's a new step arriving
+        } else {
+          addLog('#FFB84D', `<strong>Retrying</strong> ${eventType}...`);
+        }
+      } else if (status === 'BEING_PROCESSED') {
+        addLog(STEPS[stepIdx].color, `<strong>Processing</strong> ${eventType} (${STEPS[stepIdx].label})`);
+      }
+
+      renderAll();
+    }
+
+    // --- Rendering ---
+    function renderAll() {
+      renderStepsChain();
+      renderRidesList();
+      renderMap();
+      renderStats();
+    }
+
+    function renderStepsChain() {
+      // Show the most recent active ride's progress in the big chain
+      let activeRide = null;
+      for (const r of rides.values()) {
+        if (!r.done && !r.failed) { activeRide = r; break; }
+      }
+      if (!activeRide) {
+        // Show the last completed ride
+        for (const r of [...rides.values()].reverse()) {
+          if (r.done || r.failed) { activeRide = r; break; }
+        }
+      }
+
+      const cards = document.querySelectorAll('.step-card');
+      const arrows = document.querySelectorAll('.step-arrow');
+
+      cards.forEach((card, i) => {
+        card.classList.remove('done', 'active', 'failed');
+        const timeEl = card.querySelector('.step-time');
+        if (timeEl) timeEl.textContent = '';
+
+        if (!activeRide) return;
+
+        const stepEvent = STEPS[i].event;
+        const timing = activeRide.stepTimes[stepEvent];
+
+        if (activeRide.failed && activeRide.failedStep === i) {
+          card.classList.add('failed');
+          if (timing) timeEl.textContent = formatMs(timing.end - timing.start);
+        } else if (i < activeRide.currentStep) {
+          card.classList.add('done');
+          if (timing && timing.end) timeEl.textContent = formatMs(timing.end - timing.start);
+        } else if (i === activeRide.currentStep && !activeRide.done && !activeRide.failed) {
+          card.classList.add('active');
+          if (timing) timeEl.textContent = formatMs(Date.now() - timing.start);
+        }
+      });
+
+      arrows.forEach((arrow, i) => {
+        arrow.classList.remove('done');
+        if (activeRide && i < activeRide.currentStep) arrow.classList.add('done');
+      });
+    }
+
+    function renderRidesList() {
+      const container = document.getElementById('ridesList');
+      const sorted = [...rides.values()].sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        if (a.failed !== b.failed) return a.failed ? 1 : -1;
+        return b.startedAt - a.startedAt;
+      });
+
+      if (sorted.length === 0) {
+        container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--text-muted)"><p style="font-size:13px">No rides yet. Hit "Request Ride" to start.</p></div>';
+        return;
+      }
+
+      container.innerHTML = sorted.map(ride => {
+        const isActive = !ride.done && !ride.failed;
+        const badgeColor = ride.failed ? '#F87171' : ride.done ? '#4ADE80' : 'var(--accent)';
+        const badgeBg = ride.failed ? 'rgba(248,113,113,0.15)' : ride.done ? 'rgba(74,222,128,0.15)' : 'rgba(200,245,66,0.15)';
+        const badgeText = ride.failed ? 'Failed' : ride.done ? 'Completed' : STEPS[Math.min(ride.currentStep, STEPS.length - 1)].label;
+
+        const miniSteps = STEPS.map((s, i) => {
+          let cls = '';
+          if (ride.failed && ride.failedStep === i) cls = 'failed';
+          else if (i < ride.currentStep) cls = 'done';
+          else if (i === ride.currentStep && isActive) cls = 'active';
+          return `<div class="mini-step ${cls}" title="${s.event}"></div>`;
+        }).join('');
+
+        const elapsed = formatMs(Date.now() - ride.startedAt);
+
+        return `
+          <div class="ride-card ${isActive ? 'active-glow' : ''}">
+            <div class="ride-header">
+              <span class="ride-id">${ride.flowId.substring(0, 8)}</span>
+              <span class="ride-badge" style="background:${badgeBg};color:${badgeColor}">${badgeText}</span>
+            </div>
+            <div class="ride-route">
+              <div class="ride-route-line"><div class="dot" style="background:var(--accent)"></div> ${ride.pickup}</div>
+              <div class="ride-route-line"><div class="dot" style="background:#5B8DEF"></div> ${ride.dest} <span style="margin-left:auto;color:var(--text-muted);font-size:11px">${ride.driver} &middot; $${ride.price}</span></div>
+            </div>
+            <div class="mini-progress">${miniSteps}</div>
+            <div class="ride-status">
+              ${isActive ? '<div class="spinner"></div>' : ''}
+              <span style="font-size:11px;color:var(--text-muted)">Step ${Math.min(ride.currentStep + 1, STEPS.length)} of ${STEPS.length}</span>
+              <span class="ride-timer ${isActive ? 'live' : ''}" data-timer="${ride.flowId}">${elapsed}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function renderMap() {
+      const pins = document.getElementById('mapPins');
+      let html = '';
+      rides.forEach(ride => {
+        if (ride.done || ride.failed) return;
+        const step = Math.min(ride.currentStep, STEPS.length - 1);
+        const color = STEPS[step].color;
+
+        // Rider at pickup
+        html += `<circle cx="${ride.pickupLoc.x}" cy="${ride.pickupLoc.y}" r="14" fill="${color}" opacity="0.15" class="map-pulse"/>`;
+        html += `<circle cx="${ride.pickupLoc.x}" cy="${ride.pickupLoc.y}" r="5" fill="${color}"/>`;
+
+        // Destination marker
+        html += `<rect x="${ride.destLoc.x - 4}" y="${ride.destLoc.y - 4}" width="8" height="8" rx="2" fill="#5B8DEF" opacity="0.6"/>`;
+
+        // Route line
+        html += `<line x1="${ride.pickupLoc.x}" y1="${ride.pickupLoc.y}" x2="${ride.destLoc.x}" y2="${ride.destLoc.y}" stroke="${color}" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.35"/>`;
+
+        // Driver dot — moves along route based on step progress
+        if (step >= 1) {
+          const t = Math.min(step / (STEPS.length - 1), 1);
+          const dx = ride.pickupLoc.x + (ride.destLoc.x - ride.pickupLoc.x) * t;
+          const dy = ride.pickupLoc.y + (ride.destLoc.y - ride.pickupLoc.y) * t;
+          html += `<circle cx="${dx}" cy="${dy}" r="14" fill="${color}" opacity="0.12" class="map-pulse"/>`;
+          html += `<circle cx="${dx}" cy="${dy}" r="4" fill="${color}"/>`;
+          html += `<text x="${dx}" y="${dy - 10}" text-anchor="middle" font-size="8" fill="${color}" font-family="DM Sans" font-weight="600">${ride.driver.split(' ')[0]}</text>`;
+        }
+      });
+      pins.innerHTML = html;
+    }
+
+    function renderStats() {
+      let total = 0, active = 0, done = 0, failed = 0;
+      rides.forEach(r => {
+        total++;
+        if (r.done) done++;
+        else if (r.failed) failed++;
+        else active++;
+      });
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statActive').textContent = active;
+      document.getElementById('statDone').textContent = done;
+      document.getElementById('statFailed').textContent = failed;
+    }
+
+    function formatMs(ms) {
+      const s = Math.floor(ms / 1000);
+      const m = Math.floor(s / 60);
+      return m > 0 ? `${m}m ${s % 60}s` : `${s}s`;
+    }
+
+    // --- Tick timers every second ---
+    setInterval(() => {
+      renderStepsChain(); // update active step timer
+      // Update ride card timers
+      rides.forEach(ride => {
+        if (ride.done || ride.failed) return;
+        const el = document.querySelector(`[data-timer="${ride.flowId}"]`);
+        if (el) el.textContent = formatMs(Date.now() - ride.startedAt);
+      });
+    }, 1000);
+
+    // --- Event Log ---
+    function addLog(color, text) {
+      const log = document.getElementById('eventLog');
+      const li = document.createElement('li');
+      li.className = 'log-item';
+      li.innerHTML = `
+        <div class="log-dot" style="background:${color}"></div>
+        <div class="log-text">${text}</div>
+        <div class="log-time">${new Date().toLocaleTimeString()}</div>
+      `;
+      if (log.children.length > 60) log.removeChild(log.lastChild);
+      log.insertBefore(li, log.firstChild);
+    }
+
+    // --- API ---
+    async function requestRide() {
+      const pickup = document.getElementById('pickupInput').value || 'Downtown';
+      const dest = document.getElementById('destInput').value || 'Airport';
+      const flowId = crypto.randomUUID();
+
+      try {
+        const res = await fetch(API + '/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: 'RIDE_REQUESTED',
+            flow_type: 'FLOW_B',
+            flow_id: flowId,
+            payload: JSON.stringify({ pickup, destination: dest }),
+          })
+        });
+        const data = await res.json();
+        if (data.event_id) {
+          createRide(flowId, data.event_id, pickup, dest);
+          addLog('var(--accent)', `<strong>Ride requested</strong> ${pickup} &rarr; ${dest}`);
+          randomizeLocations();
+        }
+      } catch (err) {
+        addLog('#F87171', `Error: ${err.message}`);
+      }
+    }
+
+    function randomizeLocations() {
+      const a = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+      let b;
+      do { b = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)]; } while (b.name === a.name);
+      document.getElementById('pickupInput').value = a.name;
+      document.getElementById('destInput').value = b.name;
+    }
+
+    // --- WebSocket ---
+    function connectWebSocket() {
+      ws = new WebSocket(WS_URL);
+      ws.onopen = () => {
+        document.getElementById('connDot').classList.add('connected');
+        document.getElementById('connLabel').textContent = 'Connected';
+        addLog('var(--accent)', '<strong>Connected</strong> to Event Engine');
+      };
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'event_update' && msg.event) {
+          onEventUpdate(msg.event);
+        }
+      };
+      ws.onclose = () => {
+        document.getElementById('connDot').classList.remove('connected');
+        document.getElementById('connLabel').textContent = 'Disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+      ws.onerror = () => ws.close();
+    }
+
+    // --- Theme ---
+    function toggleTheme() {
+      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('themeIcon').innerHTML = next === 'dark' ? '&#9788;' : '&#9789;';
+      localStorage.setItem('theme', next);
+    }
+
+    // --- Init ---
+    (function() {
+      const saved = localStorage.getItem('theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        document.getElementById('themeIcon').innerHTML = saved === 'dark' ? '&#9788;' : '&#9789;';
+      }
+      connectWebSocket();
+    })();
+  </script>
+</body>
+</html>

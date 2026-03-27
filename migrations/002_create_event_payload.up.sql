@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS event_payload (
+  event_id   CHAR(36)    NOT NULL,
+  payload    LONGTEXT    NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (event_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

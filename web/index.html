@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Engine Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300..700;1,9..40,300..700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #F5F5F0;
+      --bg-card: #FFFFFF;
+      --bg-card-inner: #F9F9F5;
+      --bg-section-alt: #EDEDEA;
+      --text: #1A1A1A;
+      --text-muted: #8A8A8A;
+      --text-muted-faint: #B0B0A8;
+      --accent: #C8F542;
+      --accent-hover: #B8E232;
+      --border: #E8E8E3;
+      --chart-inactive: #E8E8E3;
+      --radius: 18px;
+      --radius-sm: 11px;
+      --font: 'DM Sans', sans-serif;
+      --status-awaiting: #FFB84D;
+      --status-dispatched: #5B8DEF;
+      --status-processing: #A78BFA;
+      --status-processed: #4ADE80;
+      --status-failed: #F87171;
+      --status-suspended: #94A3B8;
+      --status-canceled: #6B7280;
+    }
+    [data-theme="dark"] {
+      --bg: #111111;
+      --bg-card: #1A1A1A;
+      --bg-card-inner: #222222;
+      --bg-section-alt: #161616;
+      --text: #F5F5F0;
+      --text-muted: #7A7A7A;
+      --text-muted-faint: #4A4A4A;
+      --border: #2A2A2A;
+      --chart-inactive: #2A2A2A;
+      --accent-hover: #D4FF2B;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    /* --- Layout --- */
+    .app { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 64px;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 16px 0;
+      gap: 20px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      z-index: 100;
+    }
+
+    .sidebar-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s;
+      font-size: 18px;
+    }
+    .sidebar-icon:hover { background: var(--bg-card-inner); }
+    .sidebar-icon.active { background: var(--accent); color: #111; }
+
+    .sidebar .logo {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #111;
+      margin-bottom: 12px;
+    }
+
+    .main { margin-left: 64px; flex: 1; }
+
+    .topbar {
+      height: 60px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 28px;
+      gap: 16px;
+      background: var(--bg-card);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+    }
+
+    .topbar h1 {
+      font-size: 18px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .nav-pills {
+      display: flex;
+      gap: 4px;
+      background: var(--bg-card-inner);
+      border-radius: 999px;
+      padding: 3px;
+    }
+    .nav-pill {
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font);
+    }
+    .nav-pill:hover { color: var(--text); }
+    .nav-pill.active { background: var(--accent); color: #111; }
+
+    .theme-toggle {
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: background 0.2s;
+    }
+    .theme-toggle:hover { background: var(--bg-card-inner); }
+
+    .content { padding: 24px 28px; }
+
+    /* --- Grid --- */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    .span-2 { grid-column: span 2; }
+    .span-3 { grid-column: span 3; }
+
+    @media (max-width: 1023px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+      .span-3 { grid-column: span 2; }
+    }
+    @media (max-width: 767px) {
+      .grid, .grid-2 { grid-template-columns: 1fr; }
+      .span-2, .span-3 { grid-column: span 1; }
+      .sidebar { display: none; }
+      .main { margin-left: 0; }
+    }
+
+    /* --- Cards --- */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px;
+      transition: transform 0.2s ease;
+    }
+    .card:hover { transform: scale(1.005); }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+    }
+
+    /* --- Metric Cards --- */
+    .metric-value {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .metric-label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* --- Status Badges --- */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .status-badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .status-AWAITING_PROCESSING { background: rgba(255,184,77,0.15); color: var(--status-awaiting); }
+    .status-AWAITING_PROCESSING::before { background: var(--status-awaiting); }
+    .status-DISPATCHED { background: rgba(91,141,239,0.15); color: var(--status-dispatched); }
+    .status-DISPATCHED::before { background: var(--status-dispatched); }
+    .status-BEING_PROCESSED { background: rgba(167,139,250,0.15); color: var(--status-processing); }
+    .status-BEING_PROCESSED::before { background: var(--status-processing); }
+    .status-PROCESSED { background: rgba(74,222,128,0.15); color: var(--status-processed); }
+    .status-PROCESSED::before { background: var(--status-processed); }
+    .status-FAILED { background: rgba(248,113,113,0.15); color: var(--status-failed); }
+    .status-FAILED::before { background: var(--status-failed); }
+    .status-SUSPENDED { background: rgba(148,163,184,0.15); color: var(--status-suspended); }
+    .status-SUSPENDED::before { background: var(--status-suspended); }
+    .status-CANCELED { background: rgba(107,114,128,0.15); color: var(--status-canceled); }
+    .status-CANCELED::before { background: var(--status-canceled); }
+
+    /* --- State Machine Diagram --- */
+    .state-machine {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 20px;
+    }
+    .state-node {
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      border: 2px solid transparent;
+      transition: all 0.3s;
+      position: relative;
+    }
+    .state-node.highlight {
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(200,245,66,0.3);
+    }
+    .state-arrow {
+      font-size: 18px;
+      color: var(--text-muted);
+    }
+
+    /* --- Forms --- */
+    .form-group { margin-bottom: 14px; }
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .form-input, .form-select, .form-textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--bg-card-inner);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 14px;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus, .form-select:focus, .form-textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .form-textarea { min-height: 80px; resize: vertical; }
+
+    /* --- Buttons --- */
+    .btn {
+      padding: 10px 20px;
+      border-radius: 999px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #111;
+    }
+    .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+    .btn-secondary {
+      background: var(--bg-card-inner);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background: var(--bg-card); }
+    .btn-danger {
+      background: rgba(248,113,113,0.15);
+      color: var(--status-failed);
+    }
+    .btn-danger:hover { background: rgba(248,113,113,0.25); }
+
+    .btn-group { display: flex; gap: 8px; margin-top: 8px; }
+
+    /* --- Activity Feed --- */
+    .feed { list-style: none; }
+    .feed-item {
+      display: flex;
+      gap: 12px;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+      animation: fadeIn 0.3s ease;
+    }
+    .feed-item:last-child { border-bottom: none; }
+    .feed-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 6px;
+      flex-shrink: 0;
+    }
+    .feed-content { flex: 1; min-width: 0; }
+    .feed-text { font-size: 13px; line-height: 1.4; }
+    .feed-text strong { font-weight: 600; }
+    .feed-time { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .feed-id {
+      font-family: 'DM Sans', monospace;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--bg-card-inner);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* --- Connection Status --- */
+    .conn-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .conn-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--status-failed);
+    }
+    .conn-dot.connected { background: var(--status-processed); }
+
+    /* --- SVG Chart --- */
+    .chart-container { width: 100%; height: 180px; }
+    .chart-bar {
+      transition: height 0.5s ease, y 0.5s ease;
+    }
+    .chart-bar:hover { opacity: 0.8; }
+
+    /* --- Animations --- */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .animate-pulse { animation: pulse 2s ease-in-out infinite; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="logo">EE</div>
+      <a href="/" class="sidebar-icon active" title="Dashboard" style="text-decoration:none;color:inherit">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+      </a>
+      <a href="/rides.html" class="sidebar-icon" title="Ride Demo" style="text-decoration:none;color:inherit">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17H3v-6l2-5h9l4 5h3v6h-2"/><path d="M5 6h9l4 5"/></svg>
+      </a>
+      <div class="sidebar-icon" title="Settings" style="margin-top:auto">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main">
+      <header class="topbar">
+        <h1>Event Engine</h1>
+        <div class="nav-pills">
+          <button class="nav-pill active" data-flow="ALL">All Flows</button>
+          <button class="nav-pill" data-flow="FLOW_A">Flow A</button>
+          <button class="nav-pill" data-flow="FLOW_B">Flow B</button>
+        </div>
+        <div class="conn-status">
+          <div class="conn-dot" id="connDot"></div>
+          <span id="connLabel">Connecting...</span>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()">
+          <span id="themeIcon">&#9789;</span>
+        </button>
+      </header>
+
+      <div class="content">
+        <!-- State Machine Visualization -->
+        <div class="card span-3" style="margin-bottom:20px">
+          <div class="card-title">Event State Machine</div>
+          <div class="state-machine">
+            <div class="state-node status-AWAITING_PROCESSING" id="sm-AWAITING_PROCESSING">Awaiting</div>
+            <span class="state-arrow">&rarr;</span>
+            <div class="state-node status-DISPATCHED" id="sm-DISPATCHED">Dispatched</div>
+            <span class="state-arrow">&rarr;</span>
+            <div class="state-node status-BEING_PROCESSED" id="sm-BEING_PROCESSED">Processing</div>
+            <span class="state-arrow">&rarr;</span>
+            <div class="state-node status-PROCESSED" id="sm-PROCESSED">Processed</div>
+            <span class="state-arrow" style="margin-left:20px">|</span>
+            <div class="state-node status-FAILED" id="sm-FAILED">Failed</div>
+            <span class="state-arrow">|</span>
+            <div class="state-node status-SUSPENDED" id="sm-SUSPENDED">Suspended</div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <!-- Metric Cards -->
+          <div class="card" id="metricAwaiting">
+            <div class="card-title">Awaiting Processing</div>
+            <div class="metric-value" style="color:var(--status-awaiting)">0</div>
+            <div class="metric-label">events queued</div>
+          </div>
+          <div class="card" id="metricProcessing">
+            <div class="card-title">Being Processed</div>
+            <div class="metric-value" style="color:var(--status-processing)">0</div>
+            <div class="metric-label">events active</div>
+          </div>
+          <div class="card" id="metricProcessed">
+            <div class="card-title">Processed</div>
+            <div class="metric-value" style="color:var(--status-processed)">0</div>
+            <div class="metric-label">events completed</div>
+          </div>
+
+          <!-- Publish Event Form -->
+          <div class="card span-2">
+            <div class="card-title">Publish New Event</div>
+            <form id="publishForm" onsubmit="publishEvent(event)">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+                <div class="form-group">
+                  <label class="form-label">Event Type</label>
+                  <select class="form-select" id="eventType">
+                    <option value="FLOW_A_STEP_1_REQUESTED">FLOW_A_STEP_1_REQUESTED</option>
+                    <option value="FLOW_A_STEP_2_REQUESTED">FLOW_A_STEP_2_REQUESTED</option>
+                    <option value="FLOW_B_NOTIFICATION_REQUESTED">FLOW_B_NOTIFICATION_REQUESTED</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Flow Type</label>
+                  <select class="form-select" id="flowType">
+                    <option value="FLOW_A">FLOW_A</option>
+                    <option value="FLOW_B">FLOW_B</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Flow ID</label>
+                <input class="form-input" id="flowId" placeholder="Auto-generated UUID" value="">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Payload (JSON)</label>
+                <textarea class="form-textarea" id="payload">{"message": "Hello from the dashboard", "priority": "high"}</textarea>
+              </div>
+              <div class="btn-group">
+                <button type="submit" class="btn btn-primary">Publish Event</button>
+                <button type="button" class="btn btn-secondary" onclick="publishBatch()">Publish 5 Events</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Queue Size Chart -->
+          <div class="card">
+            <div class="card-title">Queue Distribution</div>
+            <div class="chart-container">
+              <svg id="queueChart" width="100%" height="180" viewBox="0 0 260 180">
+                <g id="chartBars"></g>
+                <line x1="30" y1="160" x2="250" y2="160" stroke="var(--border)" stroke-width="1"/>
+                <text x="65" y="175" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="DM Sans">AWA</text>
+                <text x="120" y="175" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="DM Sans">DIS</text>
+                <text x="175" y="175" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="DM Sans">PRC</text>
+                <text x="230" y="175" text-anchor="middle" fill="var(--text-muted)" font-size="9" font-family="DM Sans">SUS</text>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Event Actions -->
+          <div class="card">
+            <div class="card-title">Event Actions</div>
+            <div class="form-group">
+              <label class="form-label">Event ID</label>
+              <input class="form-input" id="actionEventId" placeholder="Paste event UUID">
+            </div>
+            <div class="btn-group" style="flex-wrap:wrap">
+              <button class="btn btn-secondary" onclick="acquirePermit()">Acquire Permit</button>
+              <button class="btn btn-primary" onclick="reportSuccess()">Report Success</button>
+              <button class="btn btn-danger" onclick="reportFailure()">Report Failure</button>
+            </div>
+          </div>
+
+          <!-- Suspend/Unsuspend -->
+          <div class="card">
+            <div class="card-title">Event Type Control</div>
+            <div class="form-group">
+              <label class="form-label">Event Type</label>
+              <select class="form-select" id="controlEventType">
+                <option value="FLOW_A_STEP_1_REQUESTED">FLOW_A_STEP_1_REQUESTED</option>
+                <option value="FLOW_A_STEP_2_REQUESTED">FLOW_A_STEP_2_REQUESTED</option>
+                <option value="FLOW_B_NOTIFICATION_REQUESTED">FLOW_B_NOTIFICATION_REQUESTED</option>
+              </select>
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-danger" onclick="suspendType()">Suspend</button>
+              <button class="btn btn-primary" onclick="unsuspendType()">Unsuspend</button>
+            </div>
+          </div>
+
+          <!-- Activity Feed -->
+          <div class="card span-3">
+            <div class="card-title">Live Activity Feed</div>
+            <ul class="feed" id="activityFeed">
+              <li class="feed-item">
+                <div class="feed-dot" style="background:var(--text-muted)"></div>
+                <div class="feed-content">
+                  <div class="feed-text">Waiting for events... Connect to the engine to see live updates.</div>
+                  <div class="feed-time">--</div>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin + '/api';
+    const WS_URL = (window.location.protocol === 'https:' ? 'wss://' : 'ws://') + window.location.host + '/ws';
+
+    let ws = null;
+    let statusCounts = {
+      AWAITING_PROCESSING: 0,
+      DISPATCHED: 0,
+      BEING_PROCESSED: 0,
+      PROCESSED: 0,
+      FAILED: 0,
+      SUSPENDED: 0
+    };
+
+    async function fetchCounts() {
+      try {
+        const res = await fetch(API + '/counts');
+        if (res.ok) {
+          const data = await res.json();
+          for (const key in statusCounts) {
+            if (key in data) statusCounts[key] = data[key];
+          }
+          updateMetrics();
+          updateChart();
+        }
+      } catch (e) { /* ignore */ }
+    }
+    fetchCounts();
+    setInterval(fetchCounts, 3000);
+
+    // --- WebSocket ---
+    function connectWebSocket() {
+      ws = new WebSocket(WS_URL);
+
+      ws.onopen = () => {
+        document.getElementById('connDot').classList.add('connected');
+        document.getElementById('connLabel').textContent = 'Connected';
+        addFeedItem('system', 'Connected to Event Engine', null);
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'event_update' && msg.event) {
+          handleEventUpdate(msg.event);
+        }
+      };
+
+      ws.onclose = () => {
+        document.getElementById('connDot').classList.remove('connected');
+        document.getElementById('connLabel').textContent = 'Disconnected';
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      ws.onerror = () => ws.close();
+    }
+
+    function handleEventUpdate(event) {
+      // Highlight state machine node
+      document.querySelectorAll('.state-node').forEach(n => n.classList.remove('highlight'));
+      const node = document.getElementById('sm-' + event.status);
+      if (node) {
+        node.classList.add('highlight');
+        setTimeout(() => node.classList.remove('highlight'), 2000);
+      }
+
+      // Refresh real counts from server on each event update
+      fetchCounts();
+
+      // Add to feed
+      const shortId = event.id.substring(0, 8);
+      const statusColor = getStatusColor(event.status);
+      addFeedItem(statusColor,
+        `Event <span class="feed-id">${shortId}...</span> &rarr; <strong>${event.status}</strong> (${event.event_type})`,
+        event.id
+      );
+    }
+
+    function getStatusColor(status) {
+      const colors = {
+        AWAITING_PROCESSING: 'var(--status-awaiting)',
+        DISPATCHED: 'var(--status-dispatched)',
+        BEING_PROCESSED: 'var(--status-processing)',
+        PROCESSED: 'var(--status-processed)',
+        FAILED: 'var(--status-failed)',
+        SUSPENDED: 'var(--status-suspended)',
+        CANCELED: 'var(--status-canceled)',
+      };
+      return colors[status] || 'var(--text-muted)';
+    }
+
+    function addFeedItem(color, html, eventId) {
+      const feed = document.getElementById('activityFeed');
+      const li = document.createElement('li');
+      li.className = 'feed-item';
+      const now = new Date().toLocaleTimeString();
+      li.innerHTML = `
+        <div class="feed-dot" style="background:${color === 'system' ? 'var(--accent)' : color}"></div>
+        <div class="feed-content">
+          <div class="feed-text">${html}</div>
+          <div class="feed-time">${now}</div>
+        </div>
+      `;
+
+      // Click to copy event ID
+      if (eventId) {
+        li.style.cursor = 'pointer';
+        li.onclick = () => {
+          document.getElementById('actionEventId').value = eventId;
+        };
+      }
+
+      // Keep max 50 items
+      if (feed.children.length > 50) {
+        feed.removeChild(feed.lastChild);
+      }
+      feed.insertBefore(li, feed.firstChild);
+    }
+
+    function updateMetrics() {
+      const m = document.getElementById('metricAwaiting');
+      m.querySelector('.metric-value').textContent = statusCounts.AWAITING_PROCESSING;
+
+      const p = document.getElementById('metricProcessing');
+      p.querySelector('.metric-value').textContent = statusCounts.BEING_PROCESSED;
+
+      const d = document.getElementById('metricProcessed');
+      d.querySelector('.metric-value').textContent = statusCounts.PROCESSED;
+    }
+
+    function updateChart() {
+      const bars = document.getElementById('chartBars');
+      const data = [
+        { label: 'AWA', value: statusCounts.AWAITING_PROCESSING, color: 'var(--status-awaiting)' },
+        { label: 'DIS', value: statusCounts.DISPATCHED, color: 'var(--status-dispatched)' },
+        { label: 'PRC', value: statusCounts.BEING_PROCESSED, color: 'var(--status-processing)' },
+        { label: 'SUS', value: statusCounts.SUSPENDED, color: 'var(--status-suspended)' },
+      ];
+
+      const maxVal = Math.max(...data.map(d => d.value), 1);
+      const barWidth = 36;
+      let html = '';
+
+      data.forEach((d, i) => {
+        const x = 47 + i * 55;
+        const height = Math.max((d.value / maxVal) * 130, 2);
+        const y = 160 - height;
+        html += `<rect class="chart-bar" x="${x}" y="${y}" width="${barWidth}" height="${height}" rx="6" fill="${d.color}" opacity="0.85"/>`;
+        html += `<text x="${x + barWidth/2}" y="${y - 6}" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="600" font-family="DM Sans">${d.value}</text>`;
+      });
+
+      bars.innerHTML = html;
+    }
+
+    // --- API Calls ---
+    async function publishEvent(e) {
+      e.preventDefault();
+
+      const flowId = document.getElementById('flowId').value || crypto.randomUUID();
+      document.getElementById('flowId').value = flowId;
+
+      try {
+        const res = await fetch(API + '/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            event_type: document.getElementById('eventType').value,
+            flow_type: document.getElementById('flowType').value,
+            flow_id: flowId,
+            payload: document.getElementById('payload').value,
+          })
+        });
+        const data = await res.json();
+        if (data.event_id) {
+          document.getElementById('actionEventId').value = data.event_id;
+          addFeedItem('var(--accent)', `Published event <span class="feed-id">${data.event_id.substring(0,8)}...</span>`, data.event_id);
+        } else {
+          addFeedItem('var(--status-failed)', `Publish failed: ${data.error || 'Unknown error'}`, null);
+        }
+      } catch (err) {
+        addFeedItem('var(--status-failed)', `Publish error: ${err.message}`, null);
+      }
+    }
+
+    async function publishBatch() {
+      for (let i = 0; i < 5; i++) {
+        const flowId = crypto.randomUUID();
+        try {
+          await fetch(API + '/events', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              event_type: document.getElementById('eventType').value,
+              flow_type: document.getElementById('flowType').value,
+              flow_id: flowId,
+              payload: JSON.stringify({ batch: true, index: i + 1 }),
+            })
+          });
+        } catch (err) { /* continue */ }
+      }
+      addFeedItem('var(--accent)', 'Published batch of 5 events', null);
+    }
+
+    async function acquirePermit() {
+      const id = document.getElementById('actionEventId').value;
+      if (!id) return alert('Enter an Event ID first');
+      try {
+        const res = await fetch(API + '/events/' + id + '/acquire', { method: 'POST' });
+        const data = await res.json();
+        addFeedItem(data.acquired ? 'var(--status-processing)' : 'var(--text-muted)',
+          data.acquired ? `Permit acquired for <span class="feed-id">${id.substring(0,8)}...</span>` : 'Permit not granted',
+          id);
+      } catch (err) {
+        addFeedItem('var(--status-failed)', `Acquire error: ${err.message}`, null);
+      }
+    }
+
+    async function reportSuccess() {
+      const id = document.getElementById('actionEventId').value;
+      if (!id) return alert('Enter an Event ID first');
+      try {
+        const res = await fetch(API + '/events/' + id + '/success', { method: 'POST' });
+        const data = await res.json();
+        addFeedItem('var(--status-processed)', `Reported success for <span class="feed-id">${id.substring(0,8)}...</span>`, id);
+      } catch (err) {
+        addFeedItem('var(--status-failed)', `Report error: ${err.message}`, null);
+      }
+    }
+
+    async function reportFailure() {
+      const id = document.getElementById('actionEventId').value;
+      if (!id) return alert('Enter an Event ID first');
+      try {
+        const res = await fetch(API + '/events/' + id + '/failure', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ error_message: 'Manual failure from dashboard' })
+        });
+        addFeedItem('var(--status-failed)', `Reported failure for <span class="feed-id">${id.substring(0,8)}...</span>`, id);
+      } catch (err) {
+        addFeedItem('var(--status-failed)', `Report error: ${err.message}`, null);
+      }
+    }
+
+    async function suspendType() {
+      const et = document.getElementById('controlEventType').value;
+      try {
+        await fetch(API + '/event-types/' + et + '/suspend', { method: 'POST' });
+        addFeedItem('var(--status-suspended)', `Suspended: <strong>${et}</strong>`, null);
+      } catch (err) {
+        addFeedItem('var(--status-failed)', `Suspend error: ${err.message}`, null);
+      }
+    }
+
+    async function unsuspendType() {
+      const et = document.getElementById('controlEventType').value;
+      try {
+        await fetch(API + '/event-types/' + et + '/unsuspend', { method: 'POST' });
+        addFeedItem('var(--accent)', `Unsuspended: <strong>${et}</strong>`, null);
+      } catch (err) {
+        addFeedItem('var(--status-failed)', `Unsuspend error: ${err.message}`, null);
+      }
+    }
+
+    // --- Theme Toggle ---
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'dark' ? 'light' : 'dark';
+      html.setAttribute('data-theme', next);
+      document.getElementById('themeIcon').innerHTML = next === 'dark' ? '&#9788;' : '&#9789;';
+      localStorage.setItem('theme', next);
+    }
+
+    // --- Nav Pills ---
+    document.querySelectorAll('.nav-pill').forEach(pill => {
+      pill.addEventListener('click', () => {
+        document.querySelectorAll('.nav-pill').forEach(p => p.classList.remove('active'));
+        pill.classList.add('active');
+      });
+    });
+
+    // --- Auto-sync event type with flow type ---
+    document.getElementById('flowType').addEventListener('change', (e) => {
+      const sel = document.getElementById('eventType');
+      const flow = e.target.value;
+      for (let opt of sel.options) {
+        if (opt.value.startsWith(flow)) { sel.value = opt.value; break; }
+      }
+    });
+
+    // --- Init ---
+    (function init() {
+      const saved = localStorage.getItem('theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        document.getElementById('themeIcon').innerHTML = saved === 'dark' ? '&#9788;' : '&#9789;';
+      }
+      updateChart();
+      connectWebSocket();
+    })();
+  </script>
+</body>
+</html>
