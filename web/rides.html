@@ -108,8 +108,9 @@
       .main { margin-left: 56px; }
       .content { padding: 16px 16px 24px; }
       .card { padding: 18px; }
-      .steps-chain { flex-wrap: wrap; overflow-x: visible; }
-      .step-card { min-width: 130px; }
+      .steps-chain { flex-direction: column; align-items: stretch; gap: 8px; overflow-x: visible; }
+      .step-card { min-width: 100%; border-radius: var(--radius-sm); }
+      .step-arrow { display: none; }
     }
 
     /* Map */
